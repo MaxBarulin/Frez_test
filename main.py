@@ -104,7 +104,7 @@ def main():
         spindle_power = float(spindle_power_input) if spindle_power_input else None
 
         # Шаг 1: Выбор материала режущей части фрезы
-        print("Выберите материал режущей части фрезы:")
+        print("\nВыберите материал режущей части фрезы:")
         tool_materials = ["Т15К6 (твёрдосплавный)", "Р6М5 (быстрорежущая сталь)"]
         for i, tool_material in enumerate(tool_materials, start=1):
             print(f"{i}. {tool_material}")
@@ -150,72 +150,146 @@ def main():
         fz_range = feed_per_tooth[material][(process_choice * 2):(process_choice * 2 + 2)]
         fz = sum(fz_range) / 2  # Среднее значение подачи на зуб
 
-        # Расчет и проверка мощности резания
-        if spindle_power is not None:
-            cutting_power = calculate_cutting_power(V_given, 3, fz, z, kc_values[material])
-            print("\nРасчет мощности резания:")
-            print(f"Формула: P = (K_c * V * a * f_z * z) / (60 * 1000)")
-            print(f"Подставляем значения: P = ({kc_values[material]} * {V_given} * {3} * {fz:.3f} * {z}) / (60 * 1000)")
-            print(f"Мощность резания P = {cutting_power:.2f} кВт")
+        # Выполняем расчёты без проверки мощности, если мощность шпинделя не указана
+        if spindle_power is None:
+            initial_n = (V_given * 1000) / (math.pi * D)
+            initial_S = fz * initial_n * z
+            print("\nРасчёт частоты вращения шпинделя:")
+            print(f"Формула: n = (V * 1000) / (π * D)")
+            print(f"Подставляем значения: n = ({V_given} * 1000) / (3.1416 * {D})")
+            print(f"Частота вращения шпинделя n = {initial_n:.2f} об/мин")
+            print(
+                f"\nРекомендуемая подача на зуб для {material} ({processing_type} обработка): {fz_range[0]} – {fz_range[1]} мм/зуб")
+            print(f"Выбранная подача на зуб f_z = {fz:.3f} мм/зуб")
+            print("\nРасчёт подачи S:")
+            print(f"Формула: S = f_z * n * z")
+            print(f"Подставляем значения: S = {fz:.3f} * {initial_n:.2f} * {z}")
+            print(f"Подача S = {initial_S:.2f} мм/мин")
+            print("\nРежимы резания для расчета времени прохода:")
+            print(
+                f"Изначальные параметры:\n- Скорость резания V = {V_given:.2f} м/мин\n- Частота вращения n = {initial_n:.2f} об/мин\n- Подача S = {initial_S:.2f} мм/мин")
 
-            # Проверка мощности шпинделя
-            if cutting_power > spindle_power:
-                print(
-                    f"\nВНИМАНИЕ: Требуемая мощность резания ({cutting_power:.2f} кВт) превышает доступную мощность шпинделя ({spindle_power} кВт).")
-                print("Рекомендуется уменьшить скорость резания, чтобы снизить нагрузку на шпиндель.\n")
+            # Запрашиваем длину обработки и рассчитываем время прохода
+            include_overtravel = input(
+                "\nУчитывать перебег инструмента?:\n1. да\n2. нет\n\nВведите номер варианта: ").strip().lower() == "1"
+            while True:
+                L = float(input("\nВведите длину обработки L (мм): "))
+                L_with_overtravel = L + (0.1 * D if include_overtravel else 0)
+                print(f"Итоговая длина L = {L_with_overtravel:.2f} мм")
 
-                # Поиск оптимальных параметров (уменьшение скорости резания на 10% до допустимого уровня)
-                alternatives = []
-                V_optimized = V_given
-                while V_optimized >= V_given * 0.1:
-                    cutting_power_optimized = calculate_cutting_power(V_optimized, 3, fz, z, kc_values[material])
+                t_initial = L_with_overtravel / initial_S
+                print("Время прохода для изначальных параметров:", round(t_initial, 2))
 
-                    if cutting_power_optimized <= spindle_power:
-                        alternatives.append((V_optimized, cutting_power_optimized))
-                    V_optimized *= 0.9
-
-                # Вывод оптимальных вариантов
-                if alternatives:
-                    print("\nНайденные оптимальные параметры для снижения нагрузки на шпиндель:")
-                    for idx, (V_opt, power_opt) in enumerate(alternatives, 1):
-                        print(f"Вариант {idx}: Скорость резания V = {V_opt:.2f} м/мин, Мощность = {power_opt:.2f} кВт")
-
-                    # Расчет времени прохода
-                    optimal_V = alternatives[0][0]
-                    optimal_n = (optimal_V * 1000) / (math.pi * D)
-                    optimal_S = fz * optimal_n * z
-                    initial_n = (V_given * 1000) / (math.pi * D)
-                    initial_S = fz * initial_n * z
-
-                    print("\nРежимы резания для расчета времени прохода:")
-                    print(
-                        f"Изначальные параметры:\n- Скорость резания V = {V_given:.2f} м/мин\n- Частота вращения n = {initial_n:.2f} об/мин\n- Подача S = {initial_S:.2f} мм/мин")
-                    print(
-                        f"\nПервый оптимальный вариант:\n- Скорость резания V = {optimal_V:.2f} м/мин\n- Частота вращения n = {optimal_n:.2f} об/мин\n- Подача S = {optimal_S:.2f} мм/мин")
-
-                    # Спрашиваем длину обработки
-                    include_overtravel = input("\nУчитывать перебег инструмента?:\n1. да\n2. нет\n\nВведите номер варианта: ").strip().lower() == "1"
-                    while True:
-                        L = float(input("\nВведите длину обработки L (мм): "))
-                        L_with_overtravel = L + (0.1 * D if include_overtravel else 0)
-                        print(f"Итоговая длина L = {L_with_overtravel:.2f} мм")
-
-                        t_optimal = L_with_overtravel / optimal_S
-                        t_initial = L_with_overtravel / initial_S
-
-                        print("\nВремя прохода для оптимального варианта:", round(t_optimal, 2))
-                        print("Время прохода для изначальных параметров:", round(t_initial, 2))
-
-                        choice = input("\nВыберете дальнейшие действия\n1. для новой длины\n2. для перезапуска\n3. для завершения\n\nВведите номер варианта:  ").strip()
-                        if choice == "1":
-                            continue
-                        elif choice == "2":
-                            main()
-                            return
-                        elif choice == "3":
-                            print("Завершение программы.")
-                            return
+                choice = input(
+                    "\nВыберите дальнейшие действия\n1. для новой длины\n2. для перезапуска\n3. для завершения\n\nВведите номер варианта:  ").strip()
+                if choice == "1":
+                    continue  # Переход на новую длину без перезапуска скрипта
+                elif choice == "2":
+                    return main()  # Полный перезапуск скрипта
+                elif choice == "3":
+                    print("Завершение программы.")
+                    return  # Завершение программы
                 else:
-                    print("Не удалось найти параметры, при которых нагрузка допустима.")
+                    print("Неверный ввод, попробуйте снова.")
+            return
+
+        # Если мощность шпинделя указана, выполняем расчет мощности и проверку
+        cutting_power = calculate_cutting_power(V_given, 3, fz, z, kc_values[material])
+        print("\nРасчет мощности резания:")
+        print(f"Формула: P = (K_c * V * a * f_z * z) / (60 * 1000)")
+        print(f"Подставляем значения: P = ({kc_values[material]} * {V_given} * {3} * {fz:.3f} * {z}) / (60 * 1000)")
+        print(f"Мощность резания P = {cutting_power:.2f} кВт")
+
+        # Проверка мощности шпинделя и подбор оптимальных параметров, если мощность превышает доступную
+        if cutting_power > spindle_power:
+            print(
+                f"\nВНИМАНИЕ: Требуемая мощность резания ({cutting_power:.2f} кВт) превышает доступную мощность шпинделя ({spindle_power} кВт).")
+            print("Рекомендуется уменьшить скорость резания, чтобы снизить нагрузку на шпиндель.\n")
+
+            # Поиск оптимальных параметров (уменьшение скорости резания на 10% до допустимого уровня)
+            alternatives = []
+            V_optimized = V_given
+            while V_optimized >= V_given * 0.1:
+                cutting_power_optimized = calculate_cutting_power(V_optimized, 3, fz, z, kc_values[material])
+
+                if cutting_power_optimized <= spindle_power:
+                    alternatives.append((V_optimized, cutting_power_optimized))
+                V_optimized *= 0.9
+
+            # Вывод оптимальных вариантов
+            if alternatives:
+                print("\nНайденные оптимальные параметры для снижения нагрузки на шпиндель:")
+                for idx, (V_opt, power_opt) in enumerate(alternatives, 1):
+                    print(f"Вариант {idx}: Скорость резания V = {V_opt:.2f} м/мин, Мощность = {power_opt:.2f} кВт")
+
+                # Использование первого оптимального варианта
+                optimal_V = alternatives[0][0]
+
+                optimal_n = (optimal_V * 1000) / (math.pi * D)
+                optimal_S = fz * optimal_n * z
+
+                initial_n = (V_given * 1000) / (math.pi * D)
+                initial_S = fz * initial_n * z
+
+
+                print("\nРежимы резания для расчета времени прохода:\n")
+
+                print(f"---------------------------")
+                print(f"Изначальные параметры:\n- Скорость резания V = {V_given:.2f} м/мин\n- Частота вращения n = {initial_n:.2f} об/мин\n- Подача S = {initial_S:.2f} мм/мин")
+                print("\nРасчёт частоты вращения шпинделя:")
+                print(f"Формула: n = (V * 1000) / (π * D)")
+                print(f"Подставляем значения: n = ({V_given} * 1000) / (3.1416 * {D})")
+                print(f"Частота вращения шпинделя n = {initial_n:.2f} об/мин")
+                print(f"\nРекомендуемая подача на зуб для {material} ({processing_type} обработка): {fz_range[0]} – {fz_range[1]} мм/зуб")
+                print(f"Выбранная подача на зуб f_z = {fz:.3f} мм/зуб")
+                print("\nРасчёт подачи S:")
+                print(f"Формула: S = f_z * n * z")
+                print(f"Подставляем значения: S = {fz:.3f} * {initial_n:.2f} * {z}")
+                print(f"Подача S = {initial_S:.2f} мм/мин\n")
+
+                print(f"---------------------------")
+                print(f"Первый оптимальный вариант:\n- Скорость резания V = {optimal_V:.2f} м/мин\n- Частота вращения n = {optimal_n:.2f} об/мин\n- Подача S = {optimal_S:.2f} мм/мин")
+                print("\nРасчёт частоты вращения шпинделя:")
+                print(f"Формула: n = (V * 1000) / (π * D)")
+                print(f"Подставляем значения: n = ({optimal_V} * 1000) / (3.1416 * {D})")
+                print(f"Частота вращения шпинделя n = {optimal_n:.2f} об/мин")
+                print(f"\nРекомендуемая подача на зуб для {material} ({processing_type} обработка): {fz_range[0]} – {fz_range[1]} мм/зуб")
+                print(f"Выбранная подача на зуб f_z = {fz:.3f} мм/зуб")
+                print("\nРасчёт подачи S:")
+                print(f"Формула: S = f_z * n * z")
+                print(f"Подставляем значения: S = {fz:.3f} * {optimal_n:.2f} * {z}")
+                print(f"Подача S = {optimal_S:.2f} мм/мин")
+
+                # Запрос и расчет длины обработки
+                include_overtravel = input(
+                    "\nУчитывать перебег инструмента?:\n1. да\n2. нет\n\nВведите номер варианта: ").strip().lower() == "1"
+                while True:
+                    L = float(input("\nВведите длину обработки L (мм): "))
+                    L_with_overtravel = L + (0.1 * D if include_overtravel else 0)
+                    print(f"Итоговая длина L = {L_with_overtravel:.2f} мм")
+
+                    t_optimal = L_with_overtravel / optimal_S
+                    t_initial = L_with_overtravel / initial_S
+
+                    print("\nВремя прохода для оптимального варианта:", round(t_optimal, 2))
+                    print("Время прохода для изначальных параметров:", round(t_initial, 2))
+
+                    choice = input(
+                        "\nВыберите дальнейшие действия\n1. для новой длины\n2. для перезапуска\n3. для завершения\n\nВведите номер варианта:  ").strip()
+                    if choice == "1":
+                        continue  # Новая длина без перезапуска
+                    elif choice == "2":
+                        return main()  # Полный перезапуск
+                    elif choice == "3":
+                        print("Завершение программы.")
+                        return  # Завершение программы
+                    else:
+                        print("Неверный ввод, попробуйте снова.")
+            else:
+                print("Не удалось найти параметры, при которых нагрузка допустима.")
+        else:
+            print("Мощность шпинделя достаточна для изначально заданных параметров.")
+
 
 main()
+
