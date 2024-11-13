@@ -170,8 +170,7 @@ def main():
                 f"Изначальные параметры:\n- Скорость резания V = {V_given:.2f} м/мин\n- Частота вращения n = {initial_n:.2f} об/мин\n- Подача S = {initial_S:.2f} мм/мин")
 
             # Запрашиваем длину обработки и рассчитываем время прохода
-            include_overtravel = input(
-                "\nУчитывать перебег инструмента?:\n1. да\n2. нет\n\nВведите номер варианта: ").strip().lower() == "1"
+            include_overtravel = input("\nУчитывать перебег инструмента?:\n1. да\n2. нет\n\nВведите номер варианта: ").strip().lower() == "1"
             while True:
                 L = float(input("\nВведите длину обработки L (мм): "))
                 L_with_overtravel = L + (0.1 * D if include_overtravel else 0)
@@ -199,6 +198,7 @@ def main():
         print(f"Формула: P = (K_c * V * a * f_z * z) / (60 * 1000)")
         print(f"Подставляем значения: P = ({kc_values[material]} * {V_given} * {3} * {fz:.3f} * {z}) / (60 * 1000)")
         print(f"Мощность резания P = {cutting_power:.2f} кВт")
+
 
         # Проверка мощности шпинделя и подбор оптимальных параметров, если мощность превышает доступную
         if cutting_power > spindle_power:
@@ -261,8 +261,7 @@ def main():
                 print(f"Подача S = {optimal_S:.2f} мм/мин")
 
                 # Запрос и расчет длины обработки
-                include_overtravel = input(
-                    "\nУчитывать перебег инструмента?:\n1. да\n2. нет\n\nВведите номер варианта: ").strip().lower() == "1"
+                include_overtravel = input("\nУчитывать перебег инструмента?:\n1. да\n2. нет\n\nВведите номер варианта: ").strip().lower() == "1"
                 while True:
                     L = float(input("\nВведите длину обработки L (мм): "))
                     L_with_overtravel = L + (0.1 * D if include_overtravel else 0)
@@ -290,6 +289,47 @@ def main():
         else:
             print("Мощность шпинделя достаточна для изначально заданных параметров.")
 
+            initial_n = (V_given * 1000) / (math.pi * D)
+            initial_S = fz * initial_n * z
+
+            print("\nРежимы резания для расчета времени прохода:\n")
+
+            print(f"---------------------------")
+            print(
+                f"Изначальные параметры:\n- Скорость резания V = {V_given:.2f} м/мин\n- Частота вращения n = {initial_n:.2f} об/мин\n- Подача S = {initial_S:.2f} мм/мин")
+            print("\nРасчёт частоты вращения шпинделя:")
+            print(f"Формула: n = (V * 1000) / (π * D)")
+            print(f"Подставляем значения: n = ({V_given} * 1000) / (3.1416 * {D})")
+            print(f"Частота вращения шпинделя n = {initial_n:.2f} об/мин")
+            print(
+                f"\nРекомендуемая подача на зуб для {material} ({processing_type} обработка): {fz_range[0]} – {fz_range[1]} мм/зуб")
+            print(f"Выбранная подача на зуб f_z = {fz:.3f} мм/зуб")
+            print("\nРасчёт подачи S:")
+            print(f"Формула: S = f_z * n * z")
+            print(f"Подставляем значения: S = {fz:.3f} * {initial_n:.2f} * {z}")
+            print(f"Подача S = {initial_S:.2f} мм/мин\n")
+
+            include_overtravel = input("\nУчитывать перебег инструмента?:\n1. да\n2. нет\n\nВведите номер варианта: ").strip().lower() == "1"
+            while True:
+                L = float(input("\nВведите длину обработки L (мм): "))
+                L_with_overtravel = L + (0.1 * D if include_overtravel else 0)
+                print(f"Итоговая длина L = {L_with_overtravel:.2f} мм")
+
+                t_initial = L_with_overtravel / initial_S
+
+                print("Время прохода для изначальных параметров:", round(t_initial, 2))
+
+                choice = input(
+                    "\nВыберите дальнейшие действия\n1. для новой длины\n2. для перезапуска\n3. для завершения\n\nВведите номер варианта:  ").strip()
+                if choice == "1":
+                    continue  # Новая длина без перезапуска
+                elif choice == "2":
+                    return main()  # Полный перезапуск
+                elif choice == "3":
+                    print("Завершение программы.")
+                    return  # Завершение программы
+                else:
+                    print("Неверный ввод, попробуйте снова.")
 
 main()
 
